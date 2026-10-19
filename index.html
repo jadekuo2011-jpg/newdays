@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>岳陽樓記：心境之淵</title>
+    <!-- 引入 Tailwind CSS 處理排版與響應式 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Google Fonts: Noto Serif TC (思源宋體) 以呈現古風氛圍 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        /* 載入 STREAMING_CHUNK:自訂背景與樣式 */
+        body {
+            font-family: 'Noto Serif TC', serif;
+            /* 改用提供的圖片作為底圖，並設定覆蓋與固定位置 */
+            background-image: url('岳陽樓記：金色江畔遊戲卷.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            color: #2c2c2c; /* 深水墨灰文字 */
+            line-height: 1.8;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.8s ease-in forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 古風按鈕樣式 */
+        .choice-btn {
+            background: transparent;
+            border: 1px solid #5a5a5a;
+            color: #2c2c2c;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .choice-btn::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 0%; height: 100%;
+            background-color: #3b3b3b;
+            transition: all 0.3s ease;
+            z-index: -1;
+        }
+
+        .choice-btn:hover {
+            color: #f4f1ea;
+            border-color: #3b3b3b;
+        }
+
+        .choice-btn:hover::before {
+            width: 100%;
+        }
+        
+        /* 載入 STREAMING_CHUNK:新增解謎與互動元素樣式 */
+        .grid-item {
+            background: #eae5d9;
+            border: 2px dashed #b5aa96;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .grid-item:hover {
+            background: #dcd6c8;
+            transform: scale(1.05);
+        }
+        .grid-item.clicked-success {
+            background: #a3c9a3; /* 成功尋寶的綠色 */
+            border-style: solid;
+            color: #1a4a1a;
+            pointer-events: none;
+        }
+        .grid-item.clicked-fail {
+            background: #c9a3a3; /* 踩雷的紅色 */
+            border-style: solid;
+            color: #4a1a1a;
+            pointer-events: none;
+        }
+        
+        .puzzle-select {
+            appearance: none;
+            background-color: #faf8f5;
+            border: 0;
+            border-bottom: 2px solid #2c2c2c;
+            padding: 0 8px;
+            font-weight: bold;
+            color: #8b2500; /* 強調答案顏色 */
+            text-align: center;
+            cursor: pointer;
+            font-size: 1.1em;
+        }
+        .puzzle-select:focus {
+            outline: none;
+            border-bottom-color: #8b2500;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- 載入 STREAMING_CHUNK:遊戲主體容器設計 -->
+    <!-- 遊戲主體容器，加入半透明與模糊效果 (bg-white/90, backdrop-blur-md) 以凸顯文字 -->
+    <div class="max-w-2xl w-full bg-[#faf8f5]/90 backdrop-blur-md rounded-lg shadow-2xl p-8 md:p-12 border border-[#e5dfd3] relative">
+        
+        <!-- 標題 -->
+        <div class="text-center mb-10">
+            <h1 class="text-3xl md:text-4xl font-semibold tracking-widest mb-2">青春樓記：高中生心境</h1>
+            <p class="text-sm text-gray-700 tracking-[0.2em] font-bold">一場關於段考與青春的抉擇</p>
+        </div>
+
+        <!-- 心境儀表板 (Mood Meter) -->
+        <div id="mood-container" class="mb-10 p-4 border border-gray-300 rounded-sm bg-[#f4f1ea]">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-sm font-semibold tracking-wider">心境狀態</span>
+                <span id="mood-value-text" class="text-sm font-bold text-gray-700">平靜 (0)</span>
+            </div>
+            <!-- 進度條軌道 -->
+            <div class="relative w-full h-2 bg-gray-300 rounded-full mt-4">
+                <!-- 中心點標記 -->
+                <div class="absolute top-0 left-1/2 w-0.5 h-full bg-gray-500 transform -translate-x-1/2"></div>
+                <!-- 玩家心境游標 -->
+                <div id="mood-marker" class="absolute top-1/2 w-4 h-4 bg-[#2c2c2c] rounded-full transform -translate-y-1/2 -translate-x-1/2 shadow-md transition-all duration-700 ease-out" style="left: 50%;"></div>
+            </div>
+            <div class="flex justify-between text-xs mt-2 text-gray-500 font-bold">
+                <span>極悲 (-100)</span>
+                <span>中庸 (0)</span>
+                <span>極喜 (+100)</span>
+            </div>
+        </div>
+
+        <!-- 故事文字區 -->
+        <div id="story-area" class="min-h-[150px] mb-8 text-lg md:text-xl text-justify tracking-wide fade-in">
+            <!-- 文字將透過 JS 動態注入 -->
+        </div>
+
+        <!-- 選擇按鈕區 -->
+        <div id="choices-area" class="flex flex-col space-y-4 fade-in">
+            <!-- 按鈕將透過 JS 動態注入 -->
+        </div>
+
+    </div>
+
+    <!-- 遊戲邏輯腳本 -->
+    <script>
+        /* 載入 STREAMING_CHUNK:初始化狀態與高中生情境劇本 */
+        // 遊戲狀態變數
+        let currentMood = 0;
+        let currentSceneIndex = 0;
+        let foundHopeCount = 0; // 尋寶關卡紀錄
+
+        // 劇本資料：加入互動與解謎關卡
+        const storyData = [
+            {
+                type: 'dialogue',
+                text: "【序章：貶謫海景第一排】<br><br>各位同學，歡迎來到《岳陽樓記：心境之淵》。這是一場需要全班共同決策的心理考驗。<br><br>高二下學期，你因為前幾次模擬考成績慘烈，被班導『貶謫』到了教室最角落的『海景第一排』（垃圾桶旁）。面對這百廢待興的課業，準備好開始我們的考驗了嗎？",
+                choices: [
+                    { text: "全班準備就緒，接受考驗！", moodChange: 0 }
+                ]
+            },
+            {
+                type: 'clicker',
+                text: '【第一關 互動尋寶：百廢具興】<br><br>你的桌面上堆滿了雜物。如同滕子京重修岳陽樓需先「百廢具興」，請班上同學指揮（老師點擊），在雜亂的桌面上找出 <strong>3 個</strong> 象徵「希望與重新出發」的物品。<br><span class="text-sm text-red-700">（注意：點到負面物品會影響心境！）</span>',
+                targetCount: 3,
+                items: [
+                    { id: 1, text: "滿江紅考卷", isHope: false, msg: "看著慘烈分數，悲從中來！ (心境 -15)", mood: -15 },
+                    { id: 2, text: "全新筆記本", isHope: true, msg: "找到新筆記本！象徵重新出發的決心！", mood: 10 },
+                    { id: 3, text: "同學的嘲笑紙條", isHope: false, msg: "看到別人的嘲笑，心裡很不是滋味... (心境 -15)", mood: -15 },
+                    { id: 4, text: "學長姐複習講義", isHope: true, msg: "傳承的智慧！如獲至寶，鬥志增加！", mood: 10 },
+                    { id: 5, text: "喝剩的珍珠奶茶", isHope: false, msg: "打翻了！弄髒了課本，超煩躁！ (心境 -15)", mood: -15 },
+                    { id: 6, text: "窗外透進的陽光", isHope: true, msg: "看見陽光，感受到一絲希望與平靜！", mood: 10 }
+                ]
+            },
+            {
+                type: 'choice',
+                text: "【第二關 情境表決：霪雨霏霏】<br><br>時光飛逝，期末考將近。然而最近適逢梅雨季，霪雨霏霏，連月不開。期待已久的校慶因為大雨取消，你參加的社團成發也頻頻出錯。你獨自看著窗外灰濛濛的天空，冷風吹進教室...<br><br>👉 <strong>請全班討論並舉手表決，你要以什麼心態面對？</strong>",
+                choices: [
+                    { text: "【A】去國懷鄉，憂讒畏譏：覺得全世界都在跟自己作對，鬱悶到了極點。", moodChange: -40 },
+                    { text: "【B】不以物喜，不以己悲：陰晴圓缺就像成績起落。靜靜深呼吸，繼續翻開書本。", moodChange: 0 },
+                    { text: "【C】滿目蕭然，感極而悲：趴在桌上大哭一場，什麼都不想管了，放棄治療。", moodChange: -30 }
+                ]
+            },
+            {
+                type: 'choice',
+                text: "【第三關 情境表決：春和景明】<br><br>終於迎來放晴的日子！不僅段考成績進步，你在大隊接力中還擔任最後一棒逆轉勝！全班為你歡呼，連隔壁班你暗戀的對象都跑來跟你說話。此刻，陽光灑滿教室，春和景明...<br><br>👉 <strong>請全班再次表決，你現在的反應是？</strong>",
+                choices: [
+                    { text: "【A】其喜洋洋者矣：太爽啦！我就是神！讀什麼書，今晚先去唱歌嗨到半夜！", moodChange: 50 },
+                    { text: "【B】寵辱偕忘：把這份喜悅收在心底，高興一天就好，明天繼續保持日常作息。", moodChange: 0 },
+                    { text: "【C】把酒臨風：得意忘形，開始對其他同學頤指氣使，覺得自己高人一等。", moodChange: 40 }
+                ]
+            },
+            {
+                type: 'puzzle',
+                text: "【最終關 全班解謎：古仁人之心】<br><br>就在你心境起伏不定時，國文老師（宛如范仲淹化身）在黑板上留下了一段千古名句，並要求全班一起填空，解開這道心靈密碼，才能迎來最終的結局。<br><br>👉 <strong>請全班大聲說出正確的字，請老師選擇！</strong>",
+                blanks: [
+                    { question: "不以", options: ["?", "物", "人", "天", "神"], answer: "物" },
+                    { question: "喜，不以", options: ["?", "他", "己", "心", "物"], answer: "己" },
+                    { question: "悲。<br><br>先天下之", options: ["?", "樂", "憂", "苦", "悲"], answer: "憂" },
+                    { question: "而憂，後天下之", options: ["?", "樂", "憂", "甜", "喜"], answer: "樂" }
+                ],
+                tailText: "而樂。"
+            }
+        ];
+
+        /* 載入 STREAMING_CHUNK:高中生情境結局設定 */
+        // 結局資料
+        const endings = {
+            trueEnding: {
+                title: "【真結局】不以物喜，不以己悲",
+                text: "國文課正好教到范仲淹的《岳陽樓記》。你回首這段時間的起伏，沒有被模擬考的挫折擊倒，也沒有因為一時的玩樂而沉淪。你悟出了「不以物喜，不以己悲」的境界。不管未來大考結果如何，你都能保持內心的平靜，帶著這份強大的心理素質，穩步邁向未來。",
+                color: "text-green-800"
+            },
+            badEnding1: {
+                title: "【悲劇結局】滿目蕭然，感極而悲",
+                text: "窗外的霪雨和接連的打擊讓你徹底放棄治療。你每天趴在桌上自怨自艾，覺得自己一無是處。雖然最後勉強畢業了，但你的心永遠困在了那場高中的悲風苦雨之中，失去了面對挫折的勇氣。",
+                color: "text-blue-800"
+            },
+            badEnding2: {
+                title: "【沉淪結局】把酒臨風，其喜洋洋",
+                text: "你沉醉於下課後的放縱與一時的快樂，將升學與未來徹底拋諸腦後。等到大考成績放榜那一天，你才發現自己完全沒有準備好，只能看著別人的好榜單羨慕嫉妒，後悔莫及。",
+                color: "text-red-800"
+            }
+        };
+
+        // DOM 元素取得
+        const storyArea = document.getElementById('story-area');
+        const choicesArea = document.getElementById('choices-area');
+        const moodMarker = document.getElementById('mood-marker');
+        const moodValueText = document.getElementById('mood-value-text');
+
+        // 更新心境儀表板
+        function updateMoodUI() {
+            // 限制數值在 -100 到 100 之間
+            currentMood = Math.max(-100, Math.min(100, currentMood));
+            
+            // 計算百分比 (0對應50%，-100對應0%，100對應100%)
+            const percentage = (currentMood + 100) / 2;
+            moodMarker.style.left = `${percentage}%`;
+
+            // 更新文字描述
+            let moodDesc = "平靜";
+            if (currentMood <= -60) moodDesc = "極悲";
+            else if (currentMood < -20) moodDesc = "憂愁";
+            else if (currentMood >= 60) moodDesc = "極喜";
+            else if (currentMood > 20) moodDesc = "愉悅";
+
+            moodValueText.textContent = `${moodDesc} (${currentMood})`;
+        }
+
+        /* 載入 STREAMING_CHUNK:渲染不同類型的遊戲場景 */
+        // 渲染當前場景
+        function renderScene() {
+            storyArea.classList.remove('fade-in');
+            choicesArea.classList.remove('fade-in');
+            void storyArea.offsetWidth; 
+            storyArea.classList.add('fade-in');
+            choicesArea.classList.add('fade-in');
+
+            if (currentSceneIndex < storyData.length) {
+                const scene = storyData[currentSceneIndex];
+                choicesArea.innerHTML = '';
+
+                // 根據場景類型渲染不同 UI
+                if (scene.type === 'dialogue' || scene.type === 'choice') {
+                    storyArea.innerHTML = `<p>${scene.text}</p>`;
+                    scene.choices.forEach(choice => {
+                        const btn = document.createElement('button');
+                        btn.className = 'choice-btn w-full text-left py-3 px-6 rounded-sm font-medium';
+                        btn.textContent = choice.text;
+                        btn.onclick = () => makeChoice(choice.moodChange);
+                        choicesArea.appendChild(btn);
+                    });
+                } 
+                else if (scene.type === 'clicker') {
+                    storyArea.innerHTML = `<p>${scene.text}</p><p id="clicker-feedback" class="mt-4 font-bold text-gray-600 h-6"></p>`;
+                    foundHopeCount = 0;
+                    
+                    const grid = document.createElement('div');
+                    grid.className = "grid grid-cols-2 md:grid-cols-3 gap-4 mt-4";
+                    
+                    // 打亂物品順序
+                    const shuffledItems = [...scene.items].sort(() => Math.random() - 0.5);
+                    
+                    shuffledItems.forEach(item => {
+                        const itemBtn = document.createElement('button');
+                        itemBtn.className = 'grid-item p-4 rounded-sm text-center font-bold tracking-wider h-24 flex items-center justify-center';
+                        itemBtn.textContent = item.text;
+                        itemBtn.onclick = () => handleItemClick(item, itemBtn, scene.targetCount);
+                        grid.appendChild(itemBtn);
+                    });
+                    choicesArea.appendChild(grid);
+                }
+                else if (scene.type === 'puzzle') {
+                    storyArea.innerHTML = `<p>${scene.text}</p>`;
+                    
+                    const puzzleContainer = document.createElement('div');
+                    puzzleContainer.className = "text-xl md:text-2xl mt-6 p-6 bg-[#eae5d9] border border-[#dcd6c8] rounded-sm leading-loose text-center font-bold text-[#2c2c2c]";
+                    
+                    scene.blanks.forEach((blank, index) => {
+                        puzzleContainer.innerHTML += `<span>${blank.question}</span>`;
+                        
+                        const select = document.createElement('select');
+                        select.className = "puzzle-select mx-2";
+                        select.id = `puzzle-select-${index}`;
+                        blank.options.forEach(opt => {
+                            select.innerHTML += `<option value="${opt}">${opt}</option>`;
+                        });
+                        puzzleContainer.appendChild(select);
+                    });
+                    
+                    puzzleContainer.innerHTML += `<span>${scene.tailText}</span>`;
+                    
+                    const submitBtn = document.createElement('button');
+                    submitBtn.className = 'choice-btn w-full text-center py-4 px-6 rounded-sm font-bold mt-8 tracking-widest bg-[#2c2c2c] text-[#f4f1ea] hover:bg-[#3b3b3b]';
+                    submitBtn.textContent = '全班確認答案送出！';
+                    submitBtn.onclick = () => checkPuzzle(scene);
+                    
+                    const feedback = document.createElement('p');
+                    feedback.id = "puzzle-feedback";
+                    feedback.className = "text-red-700 font-bold text-center mt-4 h-6";
+
+                    choicesArea.appendChild(puzzleContainer);
+                    choicesArea.appendChild(submitBtn);
+                    choicesArea.appendChild(feedback);
+                }
+            } else {
+                renderEnding();
+            }
+        }
+
+        /* 載入 STREAMING_CHUNK:互動關卡邏輯處理 */
+        // 處理尋寶點擊
+        function handleItemClick(item, btnElement, targetCount) {
+            const feedback = document.getElementById('clicker-feedback');
+            feedback.textContent = item.msg;
+            
+            // 更新心境
+            currentMood += item.mood;
+            updateMoodUI();
+
+            if (item.isHope) {
+                btnElement.classList.add('clicked-success');
+                foundHopeCount++;
+                if (foundHopeCount >= targetCount) {
+                    feedback.textContent = "太棒了！全班成功找齊了重新出發的希望！(即將進入下一關)";
+                    feedback.classList.replace('text-gray-600', 'text-green-700');
+                    // 鎖定所有按鈕
+                    document.querySelectorAll('.grid-item').forEach(b => b.style.pointerEvents = 'none');
+                    setTimeout(() => {
+                        currentSceneIndex++;
+                        renderScene();
+                    }, 2000);
+                }
+            } else {
+                btnElement.classList.add('clicked-fail');
+            }
+        }
+
+        // 檢查解謎答案
+        function checkPuzzle(scene) {
+            let allCorrect = true;
+            const feedback = document.getElementById('puzzle-feedback');
+            
+            scene.blanks.forEach((blank, index) => {
+                const select = document.getElementById(`puzzle-select-${index}`);
+                if (select.value !== blank.answer) {
+                    allCorrect = false;
+                }
+            });
+
+            if (allCorrect) {
+                feedback.textContent = "全班答對了！展現了古仁人之心！(即將揭曉結局)";
+                feedback.className = "text-green-700 font-bold text-center mt-4 h-6";
+                setTimeout(() => {
+                    currentSceneIndex++;
+                    renderScene();
+                }, 2000);
+            } else {
+                feedback.textContent = "哎呀，似乎有字填錯了，請全班再討論一下！";
+                // 答錯輕微扣分，增加壓力
+                currentMood -= 5; 
+                updateMoodUI();
+            }
+        }
+
+        // 處理一般文字選擇
+        function makeChoice(moodChange) {
+            currentMood += moodChange;
+            updateMoodUI();
+            currentSceneIndex++;
+            renderScene();
+        }
+
+        // 渲染結局
+        function renderEnding() {
+            let result;
+            
+            // 根據心境數值判斷結局
+            if (currentMood >= -20 && currentMood <= 20) {
+                result = endings.trueEnding;
+            } else if (currentMood < -20) {
+                result = endings.badEnding1;
+            } else {
+                result = endings.badEnding2;
+            }
+
+            storyArea.innerHTML = `
+                <h2 class="text-2xl font-bold mb-4 ${result.color}">${result.title}</h2>
+                <p>${result.text}</p>
+            `;
+
+            choicesArea.innerHTML = '';
+            
+            // 建立 AI 范仲淹互動區
+            const aiSection = document.createElement('div');
+            aiSection.className = "mt-8 pt-6 border-t border-[#dcd6c8]";
+            aiSection.innerHTML = `
+                <h3 class="text-xl font-bold mb-2 tracking-wide text-[#2c2c2c]">跨越千年的對話：范公解惑</h3>
+                <p class="text-sm text-gray-700 mb-4 leading-relaxed">無論結局如何，向范仲淹訴說你目前高中生活的真實煩惱吧！范公將親自為你開導。</p>
+                <textarea id="player-worry" class="w-full p-4 border border-gray-400 rounded-sm mb-3 bg-[#faf8f5]/80 focus:outline-none focus:border-gray-600 transition-colors shadow-inner" rows="3" placeholder="例如：我最近段考又考砸了，覺得自己很沒用... 或者和同學吵架了很難過..."></textarea>
+                <button id="ask-ai-btn" class="choice-btn w-full text-center py-3 px-6 rounded-sm font-bold tracking-widest bg-[#2c2c2c] text-[#f4f1ea] hover:bg-[#3b3b3b]" onclick="askFanZhongyan()">飛鴿傳書，請教范公</button>
+                <div id="ai-response-area" class="mt-5 p-5 bg-[#eae5d9] rounded-sm hidden border-l-4 border-[#2c2c2c] text-[#2c2c2c] leading-loose shadow-sm"></div>
+            `;
+            choicesArea.appendChild(aiSection);
+
+            // 重新開始按鈕
+            const restartBtn = document.createElement('button');
+            restartBtn.className = 'choice-btn w-full text-center py-4 px-6 rounded-sm font-bold mt-6 tracking-widest';
+            restartBtn.textContent = '重置心境，再次體驗';
+            restartBtn.onclick = restartGame;
+            choicesArea.appendChild(restartBtn);
+        }
+
+        // 呼叫 Gemini API 讓范仲淹回答
+        async function askFanZhongyan() {
+            const inputField = document.getElementById('player-worry');
+            const userWorry = inputField.value.trim();
+            if (!userWorry) {
+                // 如果沒有輸入，給予提示
+                inputField.placeholder = "請先寫下你的煩惱，再傳送飛鴿喔！";
+                return;
+            }
+
+            const btn = document.getElementById('ask-ai-btn');
+            const responseArea = document.getElementById('ai-response-area');
+            
+            // 進入載入狀態
+            btn.textContent = '信鴿飛行中... (范公沉思)';
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            responseArea.classList.remove('hidden');
+            responseArea.innerHTML = '<div class="animate-pulse flex space-x-2 items-center"><div class="w-2 h-2 bg-gray-600 rounded-full"></div><div class="w-2 h-2 bg-gray-600 rounded-full"></div><div class="w-2 h-2 bg-gray-600 rounded-full"></div><span class="ml-2 text-sm">正在跨越時空與范仲淹連線...</span></div>';
+
+            // 設定 Gemini API 參數
+            const systemInstruction = "你現在是北宋名臣范仲淹，剛寫完《岳陽樓記》。一位現代的高中生向你訴說他的煩惱。請用溫和長者的口吻，半文言半白話的方式，結合『不以物喜，不以己悲』、『先憂後樂』或其他豁達的人生哲理來開導他。字數請控制在 150 到 200 字以內，語氣要充滿鼓勵與智慧。";
+            const prompt = `這位現代高中生剛經歷了一場心境測試，他目前的心境指數是 ${currentMood}（-100為極度悲觀，100為極度得意忘形，0為平靜）。他的煩惱是：「${userWorry}」。請你以范仲淹的身份給予他指引。`;
+
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: systemInstruction }] }
+            };
+
+            // Canvas 環境中 apiKey 留空即可自動注入
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates.length > 0) {
+                    const aiText = result.candidates[0].content.parts[0].text;
+                    // 將換行符號轉為 HTML 的 <br> 標籤以保持排版
+                    responseArea.innerHTML = `<span class="font-bold">范仲淹回信：</span><br><br>${aiText.replace(/\n/g, '<br>')}`;
+                } else {
+                    responseArea.innerHTML = "范公目前雲遊四海，未能及時回信。請稍後再試。";
+                }
+            } catch (error) {
+                console.error("API 請求錯誤:", error);
+                responseArea.innerHTML = "時空波動，信鴿迷失了方向。(連線失敗，請稍後再試)";
+            } finally {
+                // 恢復按鈕狀態
+                btn.textContent = '再次飛鴿傳書';
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // 重新開始遊戲
+        function restartGame() {
+            currentMood = 0;
+            currentSceneIndex = 0;
+            updateMoodUI();
+            renderScene();
+        }
+
+        // 遊戲初始化
+        window.onload = () => {
+            updateMoodUI();
+            renderScene();
+        };
+
+    </script>
+</body>
+</html>
